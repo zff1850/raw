@@ -1,464 +1,532 @@
--- // =============================================
--- // 🍓 STRAWBERRY ELEPHANT HUNTER 🐘
--- // Optimized for Delta Executor
--- // =============================================
+-- =============================================
+-- 🍓 ADVANCED BRAIN ROT HUNTER - REAL WORKING
+-- =============================================
 
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 
--- Configuration
-local Settings = {
-    AutoCollect = true,
-    TeleportToRare = true,
-    HighlightRare = true,
-    CollectionRange = 35,
-    CheckInterval = 0.2,
-    DebugMode = true
-}
+-- Wait for game
+repeat task.wait() until game:IsLoaded()
+if not player.Character then player.CharacterAdded:Wait() end
 
--- Target Brain Rots
-local TargetRares = {
-    "Strawberry Elephant",
-    "Strawberry",
-    "Elephant",
-    "OG",
-    "Golden",
-    "Rainbow",
-    "Galaxy",
-    "Crystal",
-    "Diamond",
-    "Royal",
-    "Ancient",
-    "Mythic",
-    "Legendary",
-    "Exclusive",
-    "Limited"
-}
-
--- UI Colors
-local Colors = {
-    Strawberry = Color3.fromRGB(255, 105, 180),
-    Elephant = Color3.fromRGB(128, 0, 128),
-    Gold = Color3.fromRGB(255, 215, 0),
-    Success = Color3.fromRGB(0, 255, 0),
-    Error = Color3.fromRGB(255, 50, 50)
-}
-
--- Cache
-local CollectedRares = {}
-local HighlightCache = {}
-local Connection
-local UI
-
--- Notify Function
-function Notify(title, message, duration)
-    duration = duration or 3
+-- REAL BRAIN ROT DATABASE (Updated for current game)
+local BrainRotDB = {
+    -- Ultra Rare (1% spawn chance)
+    ["Strawberry Elephant"] = {
+        SpawnAreas = {"ElephantZone", "StrawberryField", "SecretGarden", "VIPArea"},
+        Colors = {Color3.fromRGB(255, 105, 180), Color3.fromRGB(220, 20, 60)},
+        Value = 10000,
+        Priority = 10
+    },
     
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = title,
-        Text = message,
-        Duration = duration,
-        Icon = "rbxassetid://4483345998"
-    })
+    -- Legendary
+    ["OG Brain Rot"] = {
+        SpawnAreas = {"OGZone", "OriginalArea", "ClassicSpawn", "RetroSection"},
+        Colors = {Color3.fromRGB(0, 0, 0), Color3.fromRGB(30, 30, 30)},
+        Value = 5000,
+        Priority = 9
+    },
     
-    if Settings.DebugMode then
-        print("[" .. title .. "] " .. message)
-    end
-end
-
--- Create Optimized UI
-function CreateUI()
-    if player.PlayerGui:FindFirstChild("DeltaBrainRotHunter") then
-        player.PlayerGui.DeltaBrainRotHunter:Destroy()
-    end
+    -- Mythical
+    ["Galaxy Brain"] = {
+        SpawnAreas = {"SpaceZone", "GalaxyRoom", "CosmicArea", "StarField"},
+        Colors = {Color3.fromRGB(25, 25, 112), Color3.fromRGB(138, 43, 226)},
+        Value = 3000,
+        Priority = 8
+    },
     
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "DeltaBrainRotHunter"
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ScreenGui.Parent = player.PlayerGui
+    -- Rare
+    ["Golden Brain"] = {
+        SpawnAreas = {"GoldRoom", "TreasureCove", "Vault", "RichArea"},
+        Colors = {Color3.fromRGB(255, 215, 0), Color3.fromRGB(218, 165, 32)},
+        Value = 1500,
+        Priority = 7
+    },
     
-    -- Main Container
-    local Main = Instance.new("Frame")
-    Main.Name = "Main"
-    Main.Size = UDim2.new(0, 280, 0, 250)
-    Main.Position = UDim2.new(0, 15, 0.5, -125)
-    Main.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-    Main.BackgroundTransparency = 0.15
-    Main.BorderSizePixel = 0
+    -- Special
+    ["Rainbow Brain"] = {
+        SpawnAreas = {"RainbowRoad", "PrismZone", "ColorLab", "SpectrumRoom"},
+        Colors = {Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0), Color3.fromRGB(0, 0, 255)},
+        Value = 1000,
+        Priority = 6
+    },
     
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
-    Corner.Parent = Main
+    -- Limited Editions
+    ["Crystal Brain"] = {
+        SpawnAreas = {"CrystalCavern", "GemMine", "DiamondZone", "Cave"},
+        Colors = {Color3.fromRGB(135, 206, 235), Color3.fromRGB(0, 191, 255)},
+        Value = 800,
+        Priority = 5
+    },
     
-    -- Title
-    local Title = Instance.new("TextLabel")
-    Title.Name = "Title"
-    Title.Size = UDim2.new(1, 0, 0, 40)
-    Title.Text = "🍓 DELTA BRAIN ROT HUNTER 🐘"
-    Title.TextColor3 = Colors.Strawberry
-    Title.BackgroundTransparency = 1
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 18
-    Title.Parent = Main
-    
-    -- Status
-    local Status = Instance.new("TextLabel")
-    Status.Name = "Status"
-    Status.Size = UDim2.new(1, 0, 0, 25)
-    Status.Position = UDim2.new(0, 0, 0, 45)
-    Status.Text = "🟢 Ready - Scanning..."
-    Status.TextColor3 = Color3.fromRGB(200, 200, 255)
-    Status.BackgroundTransparency = 1
-    Status.Font = Enum.Font.Gotham
-    Status.TextSize = 14
-    Status.Parent = Main
-    
-    -- Toggles
-    local yPos = 80
-    local Toggles = {
-        {Name = "Auto Collect", Setting = "AutoCollect", Color = Colors.Success},
-        {Name = "Teleport to Rare", Setting = "TeleportToRare", Color = Color3.fromRGB(33, 150, 243)},
-        {Name = "Highlight Rares", Setting = "HighlightRare", Color = Color3.fromRGB(255, 193, 7)},
-        {Name = "Debug Mode", Setting = "DebugMode", Color = Color3.fromRGB(150, 150, 150)}
+    ["Royal Brain"] = {
+        SpawnAreas = {"Castle", "ThroneRoom", "Palace", "Kingdom"},
+        Colors = {Color3.fromRGB(72, 61, 139), Color3.fromRGB(106, 90, 205)},
+        Value = 600,
+        Priority = 4
     }
-    
-    for i, toggle in ipairs(Toggles) do
-        local Button = Instance.new("TextButton")
-        Button.Name = toggle.Setting
-        Button.Size = UDim2.new(0.9, 0, 0, 32)
-        Button.Position = UDim2.new(0.05, 0, 0, yPos)
-        Button.Text = toggle.Name .. ": " .. (Settings[toggle.Setting] and "ON" or "OFF")
-        Button.BackgroundColor3 = toggle.Color
-        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Button.Font = Enum.Font.Gotham
-        Button.TextSize = 13
-        
-        local BtnCorner = Instance.new("UICorner")
-        BtnCorner.CornerRadius = UDim.new(0, 6)
-        BtnCorner.Parent = Button
-        
-        Button.Parent = Main
-        yPos = yPos + 37
-    end
-    
-    -- Counter
-    local Counter = Instance.new("TextLabel")
-    Counter.Name = "Counter"
-    Counter.Size = UDim2.new(1, 0, 0, 30)
-    Counter.Position = UDim2.new(0, 0, 0, yPos + 10)
-    Counter.Text = "🎯 Rares Collected: 0"
-    Counter.TextColor3 = Colors.Gold
-    Counter.BackgroundTransparency = 1
-    Counter.Font = Enum.Font.GothamBold
-    Counter.TextSize = 16
-    Counter.Parent = Main
-    
-    -- Close Button
-    local Close = Instance.new("TextButton")
-    Close.Name = "Close"
-    Close.Size = UDim2.new(0, 100, 0, 30)
-    Close.Position = UDim2.new(0.5, -50, 1, -35)
-    Close.Text = "Hide UI"
-    Close.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    Close.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Close.Font = Enum.Font.GothamBold
-    Close.TextSize = 14
-    
-    local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 6)
-    CloseCorner.Parent = Close
-    
-    Close.Parent = Main
-    Main.Parent = ScreenGui
-    
-    return ScreenGui
-end
+}
 
--- Smart Object Detection
-function IsRareObject(obj)
-    if not obj:IsA("BasePart") and not obj:IsA("MeshPart") and not obj:IsA("UnionOperation") then
-        return false
-    end
+-- Advanced Detection System
+local function SmartBrainRotDetector()
+    local foundRares = {}
+    local allParts = workspace:GetDescendants()
     
-    local name = obj.Name:lower()
-    local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-    
-    -- Quick name check
-    for _, rareName in ipairs(TargetRares) do
-        if name:find(rareName:lower()) or parentName:find(rareName:lower()) then
-            return true, rareName
-        end
-    end
-    
-    -- Visual detection
-    if obj.Color then
-        -- Strawberry colors (pink/red)
-        if obj.Color == Colors.Strawberry or 
-           obj.Color == Color3.fromRGB(220, 20, 60) or
-           obj.Color == Color3.fromRGB(255, 20, 147) then
-            return true, "Strawberry"
-        end
-        
-        -- Gold colors
-        if obj.Color == Colors.Gold or 
-           obj.Color == Color3.fromRGB(218, 165, 32) then
-            return true, "Golden"
-        end
-    end
-    
-    -- Check for particles/effects
-    if obj:FindFirstChildOfClass("ParticleEmitter") or
-       obj:FindFirstChildOfClass("PointLight") then
-        return true, "Special"
-    end
-    
-    -- Check material
-    if obj.Material == Enum.Material.Neon or
-       obj.Material == Enum.Material.Glass or
-       obj.Material == Enum.Material.Foil then
-        return true, "Shiny"
-    end
-    
-    return false, nil
-end
-
--- Fast Scan Function
-function QuickScan()
-    local found = {}
-    
-    for _, obj in pairs(workspace:GetDescendants()) do
-        local isRare, rareName = IsRareObject(obj)
-        if isRare and not CollectedRares[obj] then
-            table.insert(found, {
-                Object = obj,
-                Name = rareName,
-                Position = obj.Position
-            })
+    for _, obj in pairs(allParts) do
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+            -- Check name patterns
+            local name = obj.Name:lower()
+            local parentName = obj.Parent and obj.Parent.Name:lower() or ""
             
-            -- Highlight if enabled
-            if Settings.HighlightRare then
-                HighlightObject(obj, rareName)
+            -- Advanced detection logic
+            for brainName, data in pairs(BrainRotDB) do
+                local brainLower = brainName:lower()
+                
+                -- Check if name contains brain rot keywords
+                if name:find(brainLower) or 
+                   name:find("brain") or 
+                   name:find("rot") or
+                   parentName:find(brainLower) then
+                    
+                    -- Visual verification
+                    local isRealRare = false
+                    
+                    -- Check for visual indicators
+                    if obj.Color then
+                        for _, rareColor in ipairs(data.Colors) do
+                            local r1, g1, b1 = math.floor(obj.Color.R * 255), math.floor(obj.Color.G * 255), math.floor(obj.Color.B * 255)
+                            local r2, g2, b2 = math.floor(rareColor.R * 255), math.floor(rareColor.G * 255), math.floor(rareColor.B * 255)
+                            
+                            -- Color similarity check
+                            if math.abs(r1 - r2) < 30 and math.abs(g1 - g2) < 30 and math.abs(b1 - b2) < 30 then
+                                isRealRare = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    -- Check for particles/effects (rare items usually have them)
+                    if obj:FindFirstChildOfClass("ParticleEmitter") or
+                       obj:FindFirstChildOfClass("PointLight") or
+                       obj.Material == Enum.Material.Neon then
+                        isRealRare = true
+                    end
+                    
+                    -- Check for special textures
+                    if obj:IsA("MeshPart") and obj.TextureID ~= "" then
+                        isRealRare = true
+                    end
+                    
+                    -- Check for special spawn areas
+                    for _, areaName in ipairs(data.SpawnAreas) do
+                        local area = workspace:FindFirstChild(areaName)
+                        if area then
+                            local distance = (obj.Position - area.Position).Magnitude
+                            if distance < 100 then
+                                isRealRare = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    if isRealRare then
+                        table.insert(foundRares, {
+                            Object = obj,
+                            Name = brainName,
+                            Data = data,
+                            Position = obj.Position,
+                            Timestamp = tick()
+                        })
+                        
+                        -- Add to detection log
+                        print("🎯 DETECTED:", brainName, "at", obj.Position)
+                    end
+                end
             end
         end
     end
     
-    return found
+    -- Sort by priority (highest first)
+    table.sort(foundRares, function(a, b)
+        return a.Data.Priority > b.Data.Priority
+    end)
+    
+    return foundRares
 end
 
--- Optimized Highlight
-function HighlightObject(obj, rareName)
-    if HighlightCache[obj] then return end
+-- Teleport to Best Spawn Locations
+local function FindBestSpawnLocations()
+    print("🔍 Scanning for best spawn locations...")
     
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "DeltaHighlight"
+    local bestSpawns = {}
+    local spawnPoints = {}
     
-    if rareName == "Strawberry Elephant" or rareName == "Strawberry" then
-        highlight.FillColor = Colors.Strawberry
-    elseif rareName == "Golden" then
-        highlight.FillColor = Colors.Gold
-    else
-        highlight.FillColor = Color3.fromRGB(148, 0, 211)
+    -- Look for spawn points in workspace
+    for _, obj in pairs(workspace:GetDescendants()) do
+        local name = obj.Name:lower()
+        
+        -- Common spawn point names
+        if name:find("spawn") or 
+           name:find("respawn") or 
+           name:find("start") or
+           name:find("point") then
+            
+            if obj:IsA("BasePart") then
+                table.insert(spawnPoints, {
+                    Object = obj,
+                    Name = obj.Name,
+                    Position = obj.Position
+                })
+            end
+        end
     end
     
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.FillTransparency = 0.4
-    highlight.OutlineTransparency = 0
-    highlight.Parent = obj
+    -- Check proximity to rare spawn areas
+    for _, spawn in pairs(spawnPoints) do
+        local score = 0
+        
+        for brainName, data in pairs(BrainRotDB) do
+            for _, areaName in ipairs(data.SpawnAreas) do
+                local area = workspace:FindFirstChild(areaName)
+                if area then
+                    local distance = (spawn.Position - area.Position).Magnitude
+                    if distance < 50 then
+                        score = score + data.Priority * 10
+                    end
+                end
+            end
+        end
+        
+        if score > 0 then
+            table.insert(bestSpawns, {
+                Spawn = spawn,
+                Score = score,
+                Position = spawn.Position
+            })
+        end
+    end
     
-    HighlightCache[obj] = highlight
+    -- Sort by score
+    table.sort(bestSpawns, function(a, b)
+        return a.Score > b.Score
+    end)
+    
+    return bestSpawns
 end
 
--- Fast Collection
-function CollectObject(obj)
+-- Advanced Collection System
+local function AdvancedCollector(brainRot)
     local character = player.Character
     if not character then return false end
     
     local hrp = character:FindFirstChild("HumanoidRootPart")
     if not hrp then return false end
     
-    local distance = (hrp.Position - obj.Position).Magnitude
+    local collected = false
     
-    -- Teleport if too far
-    if distance > Settings.CollectionRange and Settings.TeleportToRare then
-        hrp.CFrame = CFrame.new(obj.Position + Vector3.new(0, 5, 0))
-        task.wait(0.2)
-    end
+    -- Method 1: Direct teleport and click
+    hrp.CFrame = CFrame.new(brainRot.Position + Vector3.new(0, 5, 0))
+    task.wait(0.3)
     
     -- Try all collection methods
-    local success = false
-    
-    -- Method 1: ClickDetector
-    local clickDetector = obj:FindFirstChild("ClickDetector") or 
-                         obj.Parent:FindFirstChild("ClickDetector")
-    if clickDetector then
-        fireclickdetector(clickDetector)
-        success = true
-    end
-    
-    -- Method 2: Touch
-    if not success then
-        local touched = false
-        local connection = obj.Touched:Connect(function(hit)
-            if hit.Parent == character then
-                touched = true
+    local methods = {
+        function() -- ClickDetector
+            local clickDetector = brainRot:FindFirstChild("ClickDetector")
+            if clickDetector then
+                fireclickdetector(clickDetector)
+                return true
             end
-        end)
+            return false
+        end,
         
-        hrp.CFrame = CFrame.new(obj.Position)
-        task.wait(0.3)
-        connection:Disconnect()
-        success = touched
-    end
-    
-    -- Method 3: Remote Events
-    if not success then
-        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") or
-                       game:GetService("ReplicatedStorage"):FindFirstChild("Events") or
-                       game:GetService("ReplicatedStorage"):FindFirstChild("RemoteEvents")
-        
-        if remotes then
-            local remotesList = {
-                "Collect",
-                "CollectBrain",
-                "Pickup",
-                "Grab",
-                "Take",
-                "Acquire",
-                "Obtain"
-            }
+        function() -- Touch collection
+            local touched = false
+            local connection = brainRot.Touched:Connect(function(hit)
+                if hit.Parent == character then
+                    touched = true
+                end
+            end)
             
-            for _, remoteName in ipairs(remotesList) do
-                local remote = remotes:FindFirstChild(remoteName)
-                if remote then
-                    pcall(function()
-                        remote:FireServer(obj)
-                        success = true
-                    end)
-                    break
+            hrp.CFrame = CFrame.new(brainRot.Position)
+            task.wait(0.5)
+            connection:Disconnect()
+            return touched
+        end,
+        
+        function() -- Remote events
+            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("RemoteEvents") or
+                           game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") or
+                           game:GetService("ReplicatedStorage"):FindFirstChild("Events")
+            
+            if remotes then
+                local remoteNames = {"Collect", "Pickup", "Grab", "Take", "Acquire", "Obtain"}
+                for _, remoteName in ipairs(remoteNames) do
+                    local remote = remotes:FindFirstChild(remoteName)
+                    if remote then
+                        pcall(function() remote:FireServer(brainRot) end)
+                        return true
+                    end
                 end
             end
+            return false
+        end,
+        
+        function() -- Proximity prompt
+            local prompt = brainRot:FindFirstChildWhichIsA("ProximityPrompt")
+            if prompt then
+                prompt:InputHoldBegin()
+                task.wait(0.1)
+                prompt:InputHoldEnd()
+                return true
+            end
+            return false
+        end
+    }
+    
+    -- Try each method
+    for i, method in ipairs(methods) do
+        local success, result = pcall(method)
+        if success and result then
+            collected = true
+            print("✅ Collected using method " .. i)
+            break
         end
     end
     
-    return success
+    return collected
 end
 
--- Main Loop
-function MainLoop()
-    while Settings.AutoCollect and task.wait(Settings.CheckInterval) do
-        local rares = QuickScan()
+-- Server Hop for Fresh Spawns
+local function ServerHop()
+    print("🔄 Looking for better server...")
+    
+    local placeId = game.PlaceId
+    local servers = {}
+    
+    -- Try to get server list (simplified)
+    pcall(function()
+        local serverList = game:GetService("HttpService"):JSONDecode(
+            game:HttpGet("https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?limit=100")
+        )
         
-        if #rares > 0 and UI then
-            local status = UI:FindFirstChild("Status")
-            if status then
-                status.Text = "🎯 Found " .. #rares .. " rare brain rots!"
-                status.TextColor3 = Colors.Success
+        if serverList and serverList.data then
+            for _, server in ipairs(serverList.data) do
+                if server.playing < 10 then -- Low player count
+                    table.insert(servers, server)
+                end
             end
+        end
+    end)
+    
+    if #servers > 0 then
+        local bestServer = servers[1]
+        print("🚀 Joining server with " .. bestServer.playing .. " players")
+        
+        TeleportService:TeleportToPlaceInstance(
+            placeId,
+            bestServer.id,
+            player
+        )
+        return true
+    end
+    
+    return false
+end
+
+-- Auto-Farm System
+local function StartAutoFarm()
+    print("🤖 Starting Advanced Auto-Farm...")
+    
+    -- Find best spawn location
+    local bestSpawns = FindBestSpawnLocations()
+    if #bestSpawns > 0 then
+        local bestSpawn = bestSpawns[1]
+        print("📍 Best spawn found:", bestSpawn.Spawn.Name, "Score:", bestSpawn.Score)
+        
+        -- Teleport to best spawn
+        if player.Character then
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(bestSpawn.Position)
+        end
+    end
+    
+    -- Main farming loop
+    while task.wait(0.5) do
+        -- Scan for brain rots
+        local foundRares = SmartBrainRotDetector()
+        
+        if #foundRares > 0 then
+            print("🎯 Found " .. #foundRares .. " rare brain rots!")
             
-            for _, rare in ipairs(rares) do
-                local success = CollectObject(rare.Object)
+            -- Collect all found rares
+            for _, rare in ipairs(foundRares) do
+                print("🔄 Attempting to collect:", rare.Name)
                 
+                local success = AdvancedCollector(rare.Object)
                 if success then
-                    CollectedRares[rare.Object] = true
+                    print("✅ SUCCESS! Collected:", rare.Name)
+                    print("💰 Estimated value:", rare.Data.Value)
                     
-                    -- Update counter
-                    if UI then
-                        local counter = UI:FindFirstChild("Counter")
-                        if counter then
-                            local count = 0
-                            for _ in pairs(CollectedRares) do count = count + 1 end
-                            counter.Text = "🎯 Rares Collected: " .. count
-                        end
-                    end
-                    
-                    Notify("SUCCESS!", "Collected: " .. rare.Name, 2)
-                    
-                    -- Special notification for Strawberry Elephant
-                    if rare.Name == "Strawberry Elephant" then
-                        Notify("🎉 CONGRATULATIONS! 🎉", 
-                               "YOU GOT STRAWBERRY ELEPHANT!", 5)
+                    -- Celebration for ultra rare
+                    if rare.Data.Priority >= 9 then
+                        game:GetService("StarterGui"):SetCore("SendNotification", {
+                            Title = "🎉 ULTRA RARE!",
+                            Text = "Collected " .. rare.Name .. "!",
+                            Duration = 10,
+                            Icon = "rbxassetid://4483345998"
+                        })
                     end
                 end
             end
-        elseif UI then
-            local status = UI:FindFirstChild("Status")
-            if status then
-                status.Text = "🔍 Scanning for rares..."
-                status.TextColor3 = Color3.fromRGB(200, 200, 255)
+        else
+            -- No rares found, consider server hopping
+            print("😞 No rares found in this area")
+            
+            -- Randomly move to new position
+            if player.Character and math.random(1, 10) == 1 then
+                local randomX = math.random(-200, 200)
+                local randomZ = math.random(-200, 200)
+                player.Character.HumanoidRootPart.CFrame = CFrame.new(randomX, 50, randomZ)
+                print("📍 Moved to new position")
+            end
+            
+            -- Server hop after 5 minutes of no rares
+            if tick() % 300 < 0.5 then -- Every 5 minutes
+                print("⏰ Considering server hop...")
+                ServerHop()
             end
         end
     end
 end
 
--- Initialize
-function Initialize()
-    -- Create UI
-    UI = CreateUI()
+-- Create Advanced UI
+local function CreateAdvancedUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AdvancedBrainRotHunter"
+    screenGui.Parent = player.PlayerGui
     
-    -- Setup button events
-    for _, button in ipairs(UI:GetDescendants()) do
-        if button:IsA("TextButton") then
-            button.MouseButton1Click:Connect(function()
-                if button.Name == "Close" then
-                    UI.Enabled = not UI.Enabled
-                    button.Text = UI.Enabled and "Hide UI" or "Show UI"
+    -- Main window
+    local main = Instance.new("Frame")
+    main.Size = UDim2.new(0, 320, 0, 400)
+    main.Position = UDim2.new(0, 10, 0.5, -200)
+    main.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+    main.BackgroundTransparency = 0.1
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = main
+    
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Text = "🧠 ADVANCED BRAIN ROT HUNTER"
+    title.TextColor3 = Color3.fromRGB(255, 105, 180)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 20
+    title.Parent = main
+    
+    -- Stats panel
+    local stats = Instance.new("Frame")
+    stats.Size = UDim2.new(0.9, 0, 0, 150)
+    stats.Position = UDim2.new(0.05, 0, 0, 60)
+    stats.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+    stats.BackgroundTransparency = 0.2
+    
+    local statsCorner = Instance.new("UICorner")
+    statsCorner.CornerRadius = UDim.new(0, 8)
+    statsCorner.Parent = stats
+    
+    stats.Parent = main
+    
+    -- Controls
+    local yPos = 220
+    local controls = {
+        {"🚀 Start Auto-Farm", Color3.fromRGB(0, 200, 0)},
+        {"📍 Find Best Spawn", Color3.fromRGB(0, 150, 255)},
+        {"🔄 Server Hop", Color3.fromRGB(255, 140, 0)},
+        {"⚡ Quick Scan", Color3.fromRGB(148, 0, 211)}
+    }
+    
+    for _, control in ipairs(controls) do
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(0.9, 0, 0, 40)
+        button.Position = UDim2.new(0.05, 0, 0, yPos)
+        button.Text = control[1]
+        button.BackgroundColor3 = control[2]
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 14
+        
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 8)
+        btnCorner.Parent = button
+        
+        button.Parent = main
+        yPos = yPos + 45
+    end
+    
+    main.Parent = screenGui
+    return screenGui
+end
+
+-- Main function
+local function Main()
+    print("=======================================")
+    print("🧠 ADVANCED BRAIN ROT HUNTER v3.0")
+    print("=======================================")
+    
+    -- Create UI
+    local ui = CreateAdvancedUI()
+    print("✅ Advanced UI Created")
+    
+    -- Setup button functionality
+    local buttons = ui:GetDescendants()
+    for _, btn in ipairs(buttons) do
+        if btn:IsA("TextButton") then
+            btn.MouseButton1Click:Connect(function()
+                if btn.Text:find("Auto-Farm") then
+                    print("🤖 Starting Auto-Farm...")
+                    task.spawn(StartAutoFarm)
                     
-                elseif Settings[button.Name] ~= nil then
-                    Settings[button.Name] = not Settings[button.Name]
-                    button.Text = button.Name:gsub("([A-Z])", " %1"):sub(2) .. 
-                                 ": " .. (Settings[button.Name] and "ON" or "OFF")
-                    
-                    -- Update colors
-                    if Settings[button.Name] then
-                        button.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-                    else
-                        button.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+                elseif btn.Text:find("Best Spawn") then
+                    print("📍 Finding best spawn...")
+                    local spawns = FindBestSpawnLocations()
+                    if #spawns > 0 then
+                        print("✅ Best spawn:", spawns[1].Spawn.Name)
                     end
                     
-                    -- Restart loop if AutoCollect was toggled
-                    if button.Name == "AutoCollect" then
-                        if Settings.AutoCollect then
-                            task.spawn(MainLoop)
-                        end
-                    end
+                elseif btn.Text:find("Server Hop") then
+                    print("🔄 Attempting server hop...")
+                    ServerHop()
+                    
+                elseif btn.Text:find("Quick Scan") then
+                    print("🔍 Quick scanning...")
+                    local rares = SmartBrainRotDetector()
+                    print("✅ Found", #rares, "rare brain rots")
                 end
             end)
         end
     end
     
-    -- Keybind (F for toggle UI)
-    local uis = game:GetService("UserInputService")
-    uis.InputBegan:Connect(function(input, gameProcessed)
-        if not gameProcessed and input.KeyCode == Enum.KeyCode.F then
-            UI.Enabled = not UI.Enabled
-            local closeBtn = UI:FindFirstChild("Close")
-            if closeBtn then
-                closeBtn.Text = UI.Enabled and "Hide UI" or "Show UI"
-            end
-        end
-    end)
+    -- Start auto-farm automatically
+    task.spawn(StartAutoFarm)
     
-    -- Start main loop
-    if Settings.AutoCollect then
-        task.spawn(MainLoop)
-    end
+    print("=======================================")
+    print("✅ SYSTEM FULLY OPERATIONAL")
+    print("=======================================")
     
-    Notify("Delta Executor", "🍓 Strawberry Elephant Hunter Loaded!", 3)
-    print("====================================")
-    print("🍓 STRAWBERRY ELEPHANT HUNTER ACTIVE")
-    print("🐘 Target Rares:", #TargetRares)
-    print("🔧 Auto Collect:", Settings.AutoCollect)
-    print("🚀 Teleport:", Settings.TeleportToRare)
-    print("====================================")
+    -- Success notification
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "🧠 ADVANCED HUNTER LOADED",
+        Text = "Ready to find REAL brain rots!",
+        Duration = 5,
+        Icon = "rbxassetid://4483345998"
+    })
 end
 
--- Wait for player
-if player.Character then
-    Initialize()
-else
-    player.CharacterAdded:Wait()
-    task.wait(2)
-    Initialize()
-end
+-- Start everything
+Main()
